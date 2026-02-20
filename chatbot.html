@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuralChat</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── DARK THEME (default) ── */
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #1a1a24;
+      --border: #2a2a3a;
+      --accent: #7c6dfa;
+      --accent2: #fa6d9a;
+      --accent3: #6dfacc;
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --user-bubble: #1e1b38;
+      --bot-bubble: #111118;
+      --shadow: rgba(0,0,0,0.6);
+      --grid-color: rgba(124,109,250,0.04);
+      --orb1: rgba(124,109,250,0.12);
+      --orb2: rgba(250,109,154,0.08);
+      --orb3: rgba(109,250,204,0.06);
+      --header-bg: rgba(255,255,255,0.02);
+      --input-area-bg: rgba(255,255,255,0.01);
+      --send-shadow: rgba(124,109,250,0.3);
+    }
+
+    /* ── LIGHT THEME ── */
+    [data-theme="light"] {
+      --bg: #f0f0f7;
+      --surface: #ffffff;
+      --surface2: #f4f4fa;
+      --border: #dcdce8;
+      --accent: #6457e8;
+      --accent2: #e8457a;
+      --accent3: #27c98a;
+      --text: #1a1a2e;
+      --muted: #8888a8;
+      --user-bubble: #eceaff;
+      --bot-bubble: #f8f8fc;
+      --shadow: rgba(100,87,232,0.08);
+      --grid-color: rgba(100,87,232,0.05);
+      --orb1: rgba(100,87,232,0.07);
+      --orb2: rgba(232,69,122,0.05);
+      --orb3: rgba(39,201,138,0.04);
+      --header-bg: rgba(255,255,255,0.85);
+      --input-area-bg: rgba(255,255,255,0.7);
+      --send-shadow: rgba(100,87,232,0.22);
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Mono', monospace;
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: background 0.4s ease;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: gridPulse 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes gridPulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      animation: orbFloat 12s ease-in-out infinite;
+      transition: background 0.4s;
+    }
+    .orb-1 { width: 400px; height: 400px; background: var(--orb1); top: -100px; left: -100px; }
+    .orb-2 { width: 300px; height: 300px; background: var(--orb2); bottom: -80px; right: -80px; animation-delay: -6s; }
+    .orb-3 { width: 200px; height: 200px; background: var(--orb3); top: 50%; right: 20%; animation-delay: -3s; }
+
+    @keyframes orbFloat {
+      0%, 100% { transform: translate(0,0) scale(1); }
+      33% { transform: translate(20px,-20px) scale(1.05); }
+      66% { transform: translate(-15px,15px) scale(0.95); }
+    }
+
+    #root {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    /* ── SHELL ── */
+    .chat-shell {
+      width: 100%;
+      max-width: 780px;
+      height: min(860px, 95vh);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 0 0 1px rgba(124,109,250,0.08), 0 40px 80px var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);
+      animation: shellIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
+      transition: background 0.4s, border-color 0.4s, box-shadow 0.4s;
+    }
+
+    @keyframes shellIn {
+      from { opacity: 0; transform: translateY(24px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--header-bg);
+      flex-shrink: 0;
+      gap: 16px;
+      transition: background 0.4s, border-color 0.4s;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      flex-shrink: 0;
+    }
+
+    .logo-mark {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 14px rgba(124,109,250,0.35);
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      transition: color 0.4s;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      background: var(--accent3);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--accent3);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:0.4; transform:scale(0.75); }
+    }
+
+    /* ── LIVE DATETIME ── */
+    .datetime-block {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      text-align: center;
+    }
+
+    .datetime-time {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: -1.5px;
+      color: var(--text);
+      line-height: 1;
+      transition: color 0.4s;
+    }
+
+    .datetime-time .ampm {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.5px;
+      margin-left: 2px;
+    }
+
+    .datetime-day {
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .datetime-date-str {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    /* ── THEME TOGGLE ── */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      cursor: pointer;
+      transition: all 0.25s;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.3px;
+      flex-shrink: 0;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .toggle-track {
+      width: 32px; height: 18px;
+      background: var(--border);
+      border-radius: 100px;
+      position: relative;
+      transition: background 0.3s;
+    }
+
+    .toggle-track.active { background: var(--accent); }
+
+    .toggle-thumb {
+      width: 12px; height: 12px;
+      background: white;
+      border-radius: 50%;
+      position: absolute;
+      top: 3px; left: 3px;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
+
+    .toggle-thumb.active { transform: translateX(14px); }
+
+    /* ── MESSAGES AREA ── */
+    .messages-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+
+    .messages-area::-webkit-scrollbar { width: 4px; }
+    .messages-area::-webkit-scrollbar-track { background: transparent; }
+    .messages-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px;
+      animation: fadeIn 0.6s ease both;
+    }
+
+    @keyframes fadeIn {
+      from { opacity:0; transform:translateY(10px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+
+    .empty-icon { font-size: 46px; filter: drop-shadow(0 0 18px rgba(124,109,250,0.45)); }
+
+    .empty-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 21px; font-weight: 700;
+      color: var(--text); letter-spacing: -0.5px;
+      transition: color 0.4s;
+    }
+
+    .empty-sub {
+      font-size: 12px; color: var(--muted);
+      text-align: center; line-height: 1.6;
+      max-width: 290px;
+    }
+
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px; }
+
+    .suggestion-chip {
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.3px;
+    }
+
+    .suggestion-chip:hover {
+      border-color: rgba(124,109,250,0.5);
+      color: var(--text);
+      background: rgba(124,109,250,0.08);
+      transform: translateY(-1px);
+    }
+
+    /* ── DATE SEPARATOR ── */
+    .date-separator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 2px 0;
+    }
+
+    .date-sep-line { flex: 1; height: 1px; background: var(--border); transition: background 0.4s; }
+
+    .date-sep-label {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* ── MESSAGE ROWS ── */
+    .message-row {
+      display: flex;
+      gap: 10px;
+      animation: msgIn 0.35s cubic-bezier(0.16,1,0.3,1) both;
+    }
+
+    @keyframes msgIn {
+      from { opacity:0; transform:translateY(10px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+
+    .message-row.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 30px; height: 30px;
+      border-radius: 9px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      margin-top: 18px;
+    }
+
+    .avatar.bot {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 10px rgba(124,109,250,0.3);
+    }
+
+    .avatar.user {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .bubble-wrap { display: flex; flex-direction: column; gap: 3px; max-width: 74%; }
+    .message-row.user .bubble-wrap { align-items: flex-end; }
+
+    .sender-label {
+      font-size: 10px; color: var(--muted);
+      letter-spacing: 0.5px; text-transform: uppercase;
+      padding: 0 4px;
+    }
+
+    .bubble {
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 13px;
+      line-height: 1.72;
+      word-break: break-word;
+      transition: background 0.4s, border-color 0.4s;
+    }
+
+    .bubble.bot {
+      background: var(--bot-bubble);
+      border: 1px solid var(--border);
+      border-radius: 4px 16px 16px 16px;
+      color: var(--text);
+    }
+
+    .bubble.user {
+      background: var(--user-bubble);
+      border: 1px solid rgba(124,109,250,0.18);
+      border-radius: 16px 4px 16px 16px;
+      color: var(--text);
+    }
+
+    .bubble-meta {
+      display: flex; align-items: center;
+      gap: 4px; padding: 0 4px;
+    }
+
+    .bubble-time { font-size: 10px; color: var(--muted); }
+    .bubble-date { font-size: 10px; color: var(--muted); opacity: 0.65; }
+
+    /* ── TYPING ── */
+    .typing-bubble {
+      background: var(--bot-bubble);
+      border: 1px solid var(--border);
+      border-radius: 4px 16px 16px 16px;
+      padding: 14px 18px;
+      display: flex; gap: 5px; align-items: center;
+    }
+
+    .typing-dot {
+      width: 7px; height: 7px;
+      background: var(--muted);
+      border-radius: 50%;
+      animation: typingBounce 1.2s ease-in-out infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingBounce {
+      0%,60%,100% { transform:translateY(0); opacity:0.4; }
+      30% { transform:translateY(-6px); opacity:1; }
+    }
+
+    /* ── INPUT AREA ── */
+    .input-area {
+      padding: 14px 18px 18px;
+      border-top: 1px solid var(--border);
+      background: var(--input-area-bg);
+      flex-shrink: 0;
+      transition: background 0.4s, border-color 0.4s;
+    }
+
+    .input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 10px 10px 10px 16px;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.4s;
+    }
+
+    .input-wrapper:focus-within {
+      border-color: rgba(124,109,250,0.5);
+      box-shadow: 0 0 0 3px rgba(124,109,250,0.06);
+    }
+
+    .chat-input {
+      flex: 1;
+      background: transparent;
+      border: none; outline: none;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      resize: none;
+      max-height: 120px;
+      padding: 2px 0;
+      scrollbar-width: none;
+      transition: color 0.4s;
+    }
+
+    .chat-input::placeholder { color: var(--muted); }
+
+    .send-btn {
+      width: 36px; height: 36px;
+      border-radius: 10px; border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      font-size: 15px;
+      box-shadow: 0 4px 12px var(--send-shadow);
+    }
+
+    .send-btn:hover:not(:disabled) { transform: scale(1.06); box-shadow: 0 6px 18px var(--send-shadow); }
+    .send-btn:active:not(:disabled) { transform: scale(0.95); }
+    .send-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+    .input-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 4px 0;
+    }
+
+    .input-hint { font-size: 10px; color: var(--muted); letter-spacing: 0.3px; }
+    .char-count { font-size: 10px; color: var(--muted); }
+
+    .clear-btn {
+      padding: 4px 11px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 10px;
+      font-family: 'DM Mono', monospace;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .clear-btn:hover { color: var(--accent2); border-color: rgba(250,109,154,0.3); }
+
+    @media (max-width: 480px) {
+      .chat-shell { border-radius: 0; height: 100vh; max-width: 100%; }
+      .messages-area { padding: 14px; }
+      .bubble-wrap { max-width: 86%; }
+      .datetime-time { font-size: 18px; }
+      .header { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useCallback } = React;
+
+    const BOT_RESPONSES = [
+      "That's a fascinating question! I'm processing your input through my neural layers right now. Based on what you've shared, I think there are a few angles worth exploring here.",
+      "Great point! Let me break that down for you. Modern AI systems operate on pattern recognition and probabilistic reasoning — here's how that applies to your question.",
+      "Interesting! Here's what I know: this is a complex area with multiple perspectives. The short answer is yes, but the nuance lies in the details.",
+      "I appreciate you asking that. Let me think through this carefully — there are both technical and practical dimensions to consider here.",
+      "That's exactly the kind of question I enjoy! The most effective approach involves understanding the underlying principles first, then applying them contextually.",
+      "Good question! Current best practices suggest a layered approach to solving this type of problem. Let me walk you through the key steps.",
+    ];
+
+    const SUGGESTIONS = [
+      "What can you help me with?",
+      "Explain neural networks",
+      "Write a Python function",
+      "Summarize a concept",
+    ];
+
+    const DAYS    = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const MONTHS  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const MONTHS3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    function getTimeParts(date) {
+      let h = date.getHours();
+      const m = String(date.getMinutes()).padStart(2,'0');
+      const s = String(date.getSeconds()).padStart(2,'0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return { h: String(h).padStart(2,'0'), m, s, ampm };
+    }
+
+    function getLongDate(date) {
+      return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    }
+
+    function getShortDate(date) {
+      return `${MONTHS3[date.getMonth()]} ${date.getDate()}`;
+    }
+
+    function formatMsgTime(date) {
+      const { h, m, ampm } = getTimeParts(date);
+      return `${h}:${m} ${ampm}`;
+    }
+
+    function formatMsgDate(date) {
+      const today = new Date();
+      if (date.toDateString() === today.toDateString()) return 'Today';
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+      return getLongDate(date);
+    }
+
+    // Live clock hook (updates every second)
+    function useClock() {
+      const [now, setNow] = useState(new Date());
+      useEffect(() => {
+        const id = setInterval(() => setNow(new Date()), 1000);
+        return () => clearInterval(id);
+      }, []);
+      return now;
+    }
+
+    // ── Components ─────────────────────────────────────────────
+
+    const TypingIndicator = () => (
+      <div className="message-row">
+        <div className="avatar bot">⚡</div>
+        <div className="bubble-wrap">
+          <span className="sender-label">Neural</span>
+          <div className="typing-bubble">
+            <div className="typing-dot"></div>
+            <div className="typing-dot"></div>
+            <div className="typing-dot"></div>
+          </div>
+        </div>
+      </div>
+    );
+
+    const Message = ({ msg }) => (
+      <div className={`message-row ${msg.role}`}>
+        <div className={`avatar ${msg.role}`}>{msg.role === 'bot' ? '⚡' : 'U'}</div>
+        <div className="bubble-wrap">
+          <span className="sender-label">{msg.role === 'bot' ? 'Neural' : 'You'}</span>
+          <div className={`bubble ${msg.role}`}>{msg.text}</div>
+          <div className="bubble-meta">
+            <span className="bubble-time">{msg.time}</span>
+            <span className="bubble-date">· {msg.dateLabel}</span>
+          </div>
+        </div>
+      </div>
+    );
+
+    const DateSeparator = ({ label }) => (
+      <div className="date-separator">
+        <div className="date-sep-line" />
+        <span className="date-sep-label">{label}</span>
+        <div className="date-sep-line" />
+      </div>
+    );
+
+    const EmptyState = ({ onSuggestion }) => (
+      <div className="empty-state">
+        <div className="empty-icon">⚡</div>
+        <h2 className="empty-title">Start a conversation</h2>
+        <p className="empty-sub">Ask me anything — code, concepts, ideas, or creative tasks.</p>
+        <div className="suggestions">
+          {SUGGESTIONS.map(s => (
+            <button key={s} className="suggestion-chip" onClick={() => onSuggestion(s)}>{s}</button>
+          ))}
+        </div>
+      </div>
+    );
+
+    const ThemeToggle = ({ isDark, onToggle }) => (
+      <button className="theme-toggle" onClick={onToggle} title="Toggle theme">
+        <span style={{fontSize:'14px'}}>{isDark ? '☀️' : '🌙'}</span>
+        <div className={`toggle-track ${!isDark ? 'active' : ''}`}>
+          <div className={`toggle-thumb ${!isDark ? 'active' : ''}`} />
+        </div>
+        <span>{isDark ? 'Light' : 'Dark'}</span>
+      </button>
+    );
+
+    function buildMessageList(messages) {
+      const items = [];
+      let lastDayStr = null;
+      messages.forEach(msg => {
+        const d = new Date(msg.id);
+        const dayStr = d.toDateString();
+        if (dayStr !== lastDayStr) {
+          lastDayStr = dayStr;
+          items.push(<DateSeparator key={`sep-${msg.id}`} label={formatMsgDate(d)} />);
+        }
+        items.push(<Message key={msg.id} msg={msg} />);
+      });
+      return items;
+    }
+
+    // ── APP ────────────────────────────────────────────────────
+    function App() {
+      const [messages, setMessages] = useState([]);
+      const [input, setInput]       = useState('');
+      const [isTyping, setIsTyping] = useState(false);
+      const [isDark, setIsDark]     = useState(true);
+      const bottomRef = useRef(null);
+      const inputRef  = useRef(null);
+      const now       = useClock();
+
+      // Apply theme to <html>
+      useEffect(() => {
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      }, [isDark]);
+
+      // Scroll to bottom on new messages
+      useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [messages, isTyping]);
+
+      const sendMessage = useCallback((text) => {
+        const content = text.trim();
+        if (!content) return;
+
+        const ts = new Date();
+        const userMsg = {
+          role: 'user', text: content,
+          time: formatMsgTime(ts),
+          dateLabel: formatMsgDate(ts),
+          id: Date.now()
+        };
+        setMessages(prev => [...prev, userMsg]);
+        setInput('');
+        setIsTyping(true);
+
+        setTimeout(() => {
+          const ts2 = new Date();
+          const botMsg = {
+            role: 'bot',
+            text: BOT_RESPONSES[Math.floor(Math.random() * BOT_RESPONSES.length)],
+            time: formatMsgTime(ts2),
+            dateLabel: formatMsgDate(ts2),
+            id: Date.now() + 1
+          };
+          setMessages(prev => [...prev, botMsg]);
+          setIsTyping(false);
+        }, 900 + Math.random() * 1100);
+      }, []);
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage(input);
+        }
+      };
+
+      const { h, m, s, ampm } = getTimeParts(now);
+      const MAX = 500;
+
+      return (
+        <div className="chat-shell">
+
+          {/* ── HEADER ── */}
+          <div className="header">
+            {/* Brand */}
+            <div className="header-left">
+              <div className="logo-mark">⚡</div>
+              <div>
+                <div className="header-title">NeuralChat</div>
+                <div className="status-badge">
+                  <div className="status-dot"></div>
+                  Online · TinyLlama-1.1B
+                </div>
+              </div>
+            </div>
+
+            {/* Live Clock + Day + Date */}
+            <div className="datetime-block">
+              <div className="datetime-time">
+                {h}:{m}:{s}<span className="ampm"> {ampm}</span>
+              </div>
+              <div className="datetime-day">{DAYS[now.getDay()]}</div>
+              <div className="datetime-date-str">{getLongDate(now)}</div>
+            </div>
+
+            {/* Theme toggle */}
+            <ThemeToggle isDark={isDark} onToggle={() => setIsDark(d => !d)} />
+          </div>
+
+          {/* ── MESSAGES ── */}
+          <div className="messages-area">
+            {messages.length === 0 && !isTyping
+              ? <EmptyState onSuggestion={sendMessage} />
+              : buildMessageList(messages)
+            }
+            {isTyping && <TypingIndicator />}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* ── INPUT ── */}
+          <div className="input-area">
+            <div className="input-wrapper">
+              <textarea
+                ref={inputRef}
+                className="chat-input"
+                placeholder="Type a message… (Shift+Enter for new line)"
+                value={input}
+                onChange={e => setInput(e.target.value.slice(0, MAX))}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                onInput={e => {
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                }}
+              />
+              <button
+                className="send-btn"
+                onClick={() => sendMessage(input)}
+                disabled={!input.trim() || isTyping}
+                title="Send"
+              >↑</button>
+            </div>
+            <div className="input-footer">
+              <span className="input-hint">Enter to send · Shift+Enter for newline</span>
+              <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
+                {messages.length > 0 && (
+                  <button className="clear-btn" onClick={() => { setMessages([]); setIsTyping(false); }}>
+                    Clear
+                  </button>
+                )}
+                <span className="char-count">{input.length}/{MAX}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
